@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('monthly_payments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId("resident_id")->constrained()->onDelete("cascade");
+            $table->foreignId("resident_id")->nullable()->constrained()->onDelete("cascade");
             $table->enum("type_payment", ["satpam", "kebersihan"]);
             $table->unsignedTinyInteger("month");
             $table->unsignedTinyInteger("year");

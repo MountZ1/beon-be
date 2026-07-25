@@ -18,4 +18,9 @@ class MonthlyPayments extends Model
         "value",
         "description"
     ];
+
+    public function resident()
+    {
+        return $this->belongsTo(Resident::class);
+    }
 }

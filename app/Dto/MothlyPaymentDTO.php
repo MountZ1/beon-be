@@ -4,7 +4,6 @@ namespace App\Dto;
 
 use Carbon\Month;
 use Illuminate\Http\Request;
-use Ramsey\Uuid\Type\Integer;
 
 class MonthlyPaymentDTO
 {
@@ -15,18 +14,18 @@ class MonthlyPaymentDTO
         public readonly int $year,
         public readonly string $flow_type,
         public readonly ?int $money_value,
-        public readonly ?string $description
+        public readonly ?string $description,
     ) {}
 
     public static function fromRequest(Request $req): self
     {
         return new self(
-            resident_id: $req->input('resident_id'),
+            resident_id: (int) $req->input('resident_id'),
             type_payment: $req->input('type_payment'),
-            month: $req->input('month'),
-            year: $req->input('year'),
+            month: Month::from((int) $req->input('month')),
+            year: (int) $req->input('year'),
             flow_type: $req->input('flow_type'),
-            money_value: $req->input('money_value'),
+            money_value: $req->filled('money_value') ? (int) $req->input('money_value') : null,
             description: $req->input('description'),
         );
     }

@@ -6,8 +6,10 @@ use App\Dto\ResidentDtO;
 use App\Models\Resident;
 use App\Services\ResidentService;
 use App\Traits\ApiResponse;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class ResidentController extends Controller
 {
@@ -46,9 +48,8 @@ class ResidentController extends Controller
             $house = $this->service->create(ResidentDto::fromRequest($request));
 
             return $this->success($house, 'Resident berhasil ditambahkan', 201);
-        } catch (\Throwable $th) {
-            Log::error("failed to create new house", $th->getMessage());
-            return $this->error($th->getMessage(), "Gagal menambahan penghuni baru", 500);
+        } catch (ValidationException $th) {
+            return $this->error("error", 500, $th->errors());
         }
     }
 
@@ -86,8 +87,8 @@ class ResidentController extends Controller
             $updated = $this->service->update($resident, ResidentDtO::fromRequest($request));
 
             return $this->success($updated, 'Resident berhasil diupdate');
-        } catch (\Throwable $th) {
-            return $this->error($th->getMessage(), 500);
+        } catch (ValidationException $th) {
+            return $this->error("error", 500, $th->errors());
         }
     }
 

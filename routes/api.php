@@ -35,5 +35,9 @@ Route::group([
     'as' => 'monthly-payment.',
     'controller' => MonthlyPaymentsController::class
 ], function () {
+    Route::post("/mass-payment", "massPayment")->name("mass-payment");
+    Route::get("/summary", "getYearlySummary")->name("yearly-summary");
+    Route::get("/{resident_id}", "getMonthlyPaymentHistoryByResidentId")->name("monthlyPaymentHistory");
+
     Route::apiResource('/', MonthlyPaymentsController::class)->except(['update', 'destroy']);
 });
