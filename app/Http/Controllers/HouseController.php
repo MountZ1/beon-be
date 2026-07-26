@@ -81,7 +81,7 @@ class HouseController extends Controller
 
             $house = $this->service->update($house, HouseDataDTO::fromRequest($request));
 
-            $this->success($house, "success update house", 201);
+            return $this->success($house, "success update house", 201);
         } catch (ValidationException $th) {
             return $this->error($th->getMessage(), 500, $th->errors());
         }

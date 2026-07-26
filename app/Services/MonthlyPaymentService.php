@@ -182,6 +182,9 @@ class MonthlyPaymentService
 
     public function getMonthlyPaymentsByResidentId(Request $request, int $residentId)
     {
+        $year = (int) $request->query('year', now()->year);
+        $currentYear = now()->year;
+
         $houseResident = HouseResident::where('resident_id', $residentId)
             ->whereNull('end_at')
             ->latest('start_at')
@@ -200,20 +203,30 @@ class MonthlyPaymentService
 
         $now = Carbon::now()->startOfMonth();
 
+        $yearStart = Carbon::create($year, 1, 1)->startOfMonth();
+        $yearEnd = Carbon::create($year, 12, 1)->startOfMonth();
+
+        $periodStart = $firstPaymentMonth->gt($yearStart) ? $firstPaymentMonth : $yearStart;
+        $periodEnd = $year < $currentYear ? $yearEnd : ($year > $currentYear ? $yearEnd : $now);
+
         $paidRecords = MonthlyPayments::where('resident_id', $residentId)
             ->where('flow_type', 'in')
+            ->where('year', $year)
             ->get()
             ->keyBy(fn($item) => "{$item->type_payment}-{$item->year}-{$item->month}");
 
         $types = ['satpam', 'kebersihan'];
         $result = collect();
 
-        $period = $firstPaymentMonth->copy();
-        while ($period->lte($now)) {
+        if ($periodStart->gt($periodEnd)) {
+            return $result;
+        }
+
+        $period = $periodStart->copy();
+        while ($period->lte($periodEnd)) {
             foreach ($types as $type) {
                 $key = "{$type}-{$period->year}-{$period->month}";
                 $paid = $paidRecords->get($key);
-
                 $result->push([
                     'id' => $paid->id ?? null,
                     'resident_id' => $residentId,
@@ -228,7 +241,7 @@ class MonthlyPaymentService
         }
 
         return $result
-            ->sortByDesc(fn($item) => $item['year'] * 100 + $item['month'])
+            ->sortBy(fn($item) => $item['year'] * 100 + $item['month'])
             ->values();
     }
 }

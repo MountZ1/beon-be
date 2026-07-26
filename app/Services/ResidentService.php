@@ -28,17 +28,22 @@ class ResidentService
                 $query->where('resident_status', $residentStatus);
             })
             ->when($status === 'aktif', function ($query) {
-                $query->whereHas('houseResidents', function ($q) {
+                $query->whereHas('houseResident', function ($q) {
                     $q->whereNull('end_at');
                 });
             })
             ->when($status === 'nonaktif', function ($query) {
-                $query->whereDoesntHave('houseResidents', function ($q) {
+                $query->whereDoesntHave('houseResident', function ($q) {
                     $q->whereNull('end_at');
                 });
             })
             ->with("houseResident", function ($q) {
-                $q->select(['resident_id', 'end_at', 'start_at']);
+                $q->select(['id', 'house_id', 'resident_id', 'end_at', 'start_at'])
+                    ->whereNull('end_at')
+                    ->where('start_at', '<=', now())
+                    ->with('house:id,no_rumah')
+                    ->latest('start_at')
+                    ->limit(1);
             })
             ->latest()
             ->paginate($perPage);

@@ -23,28 +23,45 @@ class HouseService
         $search = $request->query('search');
         $status = $request->query('status');
 
-        return House::select(['id', 'no_rumah', 'updated_at'])
+        $houses = House::select(['id', 'no_rumah', 'updated_at'])
             ->when($search, function ($query) use ($search) {
                 $query->where('no_rumah', 'like', "%{$search}%");
             })
             ->when($status === 'aktif', function ($query) {
                 $query->whereHas('residentHouse', function ($q) {
-                    $q->whereNull('end_at');
+                    $q->whereNull('end_at')->where('start_at', '<=', now());
                 });
             })
             ->when($status === 'nonaktif', function ($query) {
                 $query->whereDoesntHave('residentHouse', function ($q) {
-                    $q->whereNull('end_at');
+                    $q->whereNull('end_at')->where('start_at', '<=', now());
                 });
             })
             ->withExists(['residentHouse as is_occupied' => function ($q) {
-                $q->whereNull('end_at');
+                $q->whereNull('end_at')->where('start_at', '<=', now());
             }])
-            ->with(['residentHouse' => function ($q) {
-                $q->whereNull('end_at')->with('resident:id,name,phone_number');
+            ->withExists(['residentHouse as is_reserved' => function ($q) {
+                $q->whereNull('end_at')->where('start_at', '>', now());
             }])
+            ->with([
+                'currentResident.resident:id,name,phone_number',
+                'reservedResident.resident:id,name,phone_number',
+            ])
             ->latest()
             ->paginate($perPage);
+
+        $houses->getCollection()->transform(function ($house) {
+            $house->current_resident = $house->currentResident?->resident;
+            $house->end_at = $house->currentResident?->end_at;
+
+            $house->reserved_resident = $house->reservedResident?->resident;
+            $house->reserved_start_at = $house->reservedResident?->start_at;
+
+            unset($house->currentResident, $house->reservedResident);
+            return $house;
+        });
+
+        return $houses;
     }
 
     public function create(HouseDataDTO $data): House
@@ -65,19 +82,19 @@ class HouseService
         return $house;
     }
 
-
     public function getResidentHistoryByHouseId(int $houseId, Request $request): LengthAwarePaginator
     {
         $perPage = $request->query('per_page', 10);
-
         $houseResidents = HouseResident::query()
             ->select(['id', 'house_id', 'resident_id', 'start_at', 'end_at'])
             ->where('house_id', $houseId)
             ->with(['resident' => function ($query) {
                 $query->select(['id', 'name', 'phone_number']);
             }])
-            ->latest()
+            ->orderByRaw('end_at IS NOT NULL')
+            ->orderByDesc('end_at')
             ->paginate($perPage);
+
         return $houseResidents;
     }
 
@@ -107,7 +124,11 @@ class HouseService
                 $expiresAt = Carbon::now()->addMinutes(30);
                 $suggestedEndAt = Carbon::parse($resident->start_at)->subDay();
 
-                Cache::put($cacheKey, $resident, $expiresAt);
+                Cache::put($cacheKey, [
+                    'house_id' => $resident->house_id,
+                    'resident_id' => $resident->resident_id,
+                    'start_at' => $resident->start_at,
+                ], $expiresAt);
 
                 throw ValidationException::withMessages([
                     'exception' => 'There is still an active resident in this house.',
@@ -153,8 +174,7 @@ class HouseService
                 ->first();
 
             if ($activeResident) {
-                $suggestedEndAt = Carbon::parse($cachedPayload->start_at)->subDay();
-
+                $suggestedEndAt = Carbon::parse($cachedPayload['start_at'])->subDay();
                 $activeResident->update([
                     'end_at' => $suggestedEndAt,
                 ]);
@@ -163,9 +183,10 @@ class HouseService
             // Create the new resident record
             $newResident = HouseResident::create([
                 'house_id' => $houseId,
-                'resident_id' => $cachedPayload->resident_id,
-                'start_at' => $cachedPayload->start_at,
+                'resident_id' => $cachedPayload['resident_id'],
+                'start_at' => $cachedPayload['start_at'],
             ]);
+
 
             // Clear the cache since it's already been used
             Cache::forget($cacheKey);
