@@ -8,8 +8,10 @@ use App\Dto\ResidentHouseDTO;
 use App\Models\House;
 use App\Services\HouseService;
 use App\Traits\ApiResponse;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class HouseController extends Controller
 {
@@ -44,10 +46,9 @@ class HouseController extends Controller
 
             $house = $this->service->create(HouseDataDTO::fromRequest($request));
 
-            $this->success($house, "success create house", 201);
-        } catch (\Throwable $th) {
-            Log::error("Failed to create house ", $th->getMessage());
-            return $this->error($th->getMessage(), 500);
+            return $this->success($house, "success create house", 201);
+        } catch (ValidationException $th) {
+            return $this->error($th->getMessage(), 500, $th->errors());
         }
     }
 
@@ -81,9 +82,8 @@ class HouseController extends Controller
             $house = $this->service->update($house, HouseDataDTO::fromRequest($request));
 
             $this->success($house, "success update house", 201);
-        } catch (\Throwable $th) {
-            Log::error("Failed to update house ", $th->getMessage());
-            return $this->error($th->getMessage(), 500);
+        } catch (ValidationException $th) {
+            return $this->error($th->getMessage(), 500, $th->errors());
         }
     }
 
@@ -110,9 +110,8 @@ class HouseController extends Controller
             $houseResident = $this->service->updateLeavingResidentByHouse($houseID, $residentID, ResidentHouseDTO::fromRequest($req));
 
             return $this->success($houseResident, "success update leving resident", 200);
-        } catch (\Throwable $th) {
-            Log::error("failed to update leaving resident : ", $th->getMessage());
-            return $this->error($th->getMessage(), 500);
+        } catch (ValidationException $th) {
+            return $this->error($th->getMessage(), 500, $th->errors());
         }
     }
 
@@ -128,8 +127,8 @@ class HouseController extends Controller
             $houseResident = $this->service->createNewResidentToHouse(CreateResidentHouseDTO::fromRequest($req));
 
             return $this->success($houseResident, "success create new resident into this house", 200);
-        } catch (\Throwable $th) {
-            return $this->error($th->getMessage(), 500);
+        } catch (ValidationException $th) {
+            return $this->error($th->getMessage(), 500, $th->errors());
         }
     }
 
@@ -137,8 +136,8 @@ class HouseController extends Controller
     {
         try {
             return $this->success($this->service->confirmNewResidentToHouse($houseID), "success update and create new resident into this house", 200);
-        } catch (\Throwable $th) {
-            return $this->error($th->getMessage(), 500);
+        } catch (ValidationException $th) {
+            return $this->error($th->getMessage(), 500, $th->errors());
         }
     }
 }

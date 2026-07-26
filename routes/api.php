@@ -26,9 +26,9 @@ Route::group([
         Route::get('/{id}', 'getHistoryResident')->name('history');
         Route::post('/{id}/leaving/{resident_id}', 'updateLeavingResident')->name('leaving');
     });
-
-    Route::apiResource('/', HouseController::class)->except(['destroy']);
 });
+
+Route::apiResource('/houses', HouseController::class)->except(['destroy']);
 
 Route::group([
     'prefix' => 'monthly-payments',
@@ -38,6 +38,6 @@ Route::group([
     Route::post("/mass-payment", "massPayment")->name("mass-payment");
     Route::get("/summary", "getYearlySummary")->name("yearly-summary");
     Route::get("/{resident_id}", "getMonthlyPaymentHistoryByResidentId")->name("monthlyPaymentHistory");
-
-    Route::apiResource('/', MonthlyPaymentsController::class)->except(['update', 'destroy']);
 });
+
+Route::apiResource('/monthly-payments', MonthlyPaymentsController::class)->except(['update', 'destroy']);

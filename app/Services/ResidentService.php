@@ -17,7 +17,7 @@ class ResidentService
         $status = $request->query('status');
         $residentStatus = $request->query('resident_status');
 
-        return Resident::select(["id", "name", "resident_status", "updated_at"])
+        return Resident::select(["id", "name", "resident_status", "phone_number", "updated_at"])
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
@@ -36,6 +36,9 @@ class ResidentService
                 $query->whereDoesntHave('houseResidents', function ($q) {
                     $q->whereNull('end_at');
                 });
+            })
+            ->with("houseResident", function ($q) {
+                $q->select(['resident_id', 'end_at', 'start_at']);
             })
             ->latest()
             ->paginate($perPage);

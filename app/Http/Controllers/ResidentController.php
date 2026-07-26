@@ -39,10 +39,10 @@ class ResidentController extends Controller
         try {
             $request->validate([
                 'name' => 'required|string|max:255',
-                'ktp' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+                'ktp' => 'required|image|mimes:jpg,jpeg,png|max:2048',
                 'resident_status' => 'required|in:kontrak,tetap',
                 'phone_number' => 'required|string|max:20',
-                'married' => 'nullable|boolean',
+                'married' => 'required|boolean',
             ]);
 
             $house = $this->service->create(ResidentDto::fromRequest($request));
@@ -78,10 +78,10 @@ class ResidentController extends Controller
         try {
             $request->validate([
                 'name' => 'required|string|max:255',
-                'ktp' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+                'ktp' => 'required|image|mimes:jpg,jpeg,png|max:2048',
                 'resident_status' => 'required|in:kontrak,tetap',
                 'phone_number' => 'required|string|max:20',
-                'married' => 'nullable|boolean',
+                'married' => 'required|boolean',
             ]);
 
             $updated = $this->service->update($resident, ResidentDtO::fromRequest($request));

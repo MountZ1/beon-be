@@ -14,8 +14,8 @@ class HouseDataDTO
     public static function fromRequest(Request $req): self
     {
         return new self(
-            noRumah: $req->validated("no_rumah"),
-            description: $req->validated("description")
+            noRumah: $req->input("no_rumah"),
+            description: $req->input("description")
         );
     }
 }
