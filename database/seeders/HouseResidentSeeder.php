@@ -38,8 +38,6 @@ class HouseResidentSeeder extends Seeder
                 'start_at' => $startAt,
                 'end_at' => null,
             ]);
-
-            $house->update(['is_occupied' => true]);
         }
 
         $stillStaying = $kontrakResidents->slice(0, 2)->values();
@@ -53,8 +51,6 @@ class HouseResidentSeeder extends Seeder
                 'start_at' => $startAt,
                 'end_at' => null,
             ]);
-
-            $house->update(['is_occupied' => true]);
         }
 
         $alreadyLeft = $kontrakResidents->slice(2, 6)->values();
@@ -75,10 +71,6 @@ class HouseResidentSeeder extends Seeder
                 'start_at' => $startAt,
                 'end_at' => $endAt,
             ]);
-        }
-
-        foreach ($leftoverHouses as $house) {
-            $house->update(['is_occupied' => false]);
         }
     }
 }

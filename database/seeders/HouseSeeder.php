@@ -17,7 +17,6 @@ class HouseSeeder extends Seeder
             House::create([
                 'no_rumah' => 'A-' . str_pad($i, 2, '0', STR_PAD_LEFT),
                 'description' => 'Rumah tipe ' . fake()->randomElement(['36', '45', '60']),
-                'is_occupied' => false,
             ]);
         }
     }
