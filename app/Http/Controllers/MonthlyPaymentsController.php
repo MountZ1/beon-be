@@ -40,19 +40,19 @@ class MonthlyPaymentsController extends Controller
     {
         try {
             $request->validate([
-                'resident_id' => 'required|integer|exists:residents,id',
-                'type_payment' => 'required|string|in:satpam,kebersihan',
+                'resident_id' => 'nullable|required_if:flow_type,in|integer|exists:residents,id',
+                'type_payment' => 'nullable|required_if:flow_type,in|string|in:satpam,kebersihan',
                 'month' => 'required|integer|min:1|max:12',
                 'year' => 'required|integer|min:2000|max:2100',
                 'flow_type' => 'required|string|in:in,out',
-                'value' => 'required_if:flow_type,out|numeric|min:0',
-                'description' => 'required_if:flow_type,out|string',
+                'value' => 'nullable|required_if:flow_type,out|numeric|min:0',
+                'description' => 'nullable|required_if:flow_type,out|string',
             ]);
             $monthlyPayment = $this->service->create(MonthlyPaymentDTO::fromRequest($request));
 
             return $this->success($monthlyPayment, "Success create monthly payment", 200);
         } catch (\Throwable $th) {
-            $this->error($th->getMessage(), 409);
+            return $this->error($th->getMessage(), 409);
         }
     }
 
@@ -70,14 +70,14 @@ class MonthlyPaymentsController extends Controller
             $request->validate([
                 'resident_id' => 'required|integer|exists:residents,id',
                 'type_payment' => 'required|string|in:satpam,kebersihan',
-                'month_total' => 'required|integer|min:1|max:24',
+                'month_total' => 'required|integer|min:1',
             ]);
 
             $massPayment = $this->service->massCreate(MassMonthlyPaymentDTO::fromRequest($request));
 
             return $this->success($massPayment, "success make mass payment");
         } catch (\Throwable $th) {
-            $this->error($th->getMessage(), 500);
+            return $this->error($th->getMessage(), 500);
         }
     }
 

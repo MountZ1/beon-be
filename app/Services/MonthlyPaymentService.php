@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class MonthlyPaymentService
@@ -18,10 +19,10 @@ class MonthlyPaymentService
     public function getList(Request $request): LengthAwarePaginator
     {
         $perPage = $request->query('per_page', 10);
-        $month = $request->query('month');
-        $year = $request->query('year');
+        $month = $request->query('month', now()->month());
+        $year = $request->query('year', now()->year());
         $typePayment = $request->query('type_payment');
-        $flowType = $request->query('flow_type');
+        $flowType = $request->query('flow_type', "in");
 
         return MonthlyPayments::query()
             ->with(['resident' => function ($query) {
@@ -58,13 +59,15 @@ class MonthlyPaymentService
             ? $dto->money_value
             : $this->getFixedPaymentValue($dto->type_payment);
 
+        Log::info($value);
+
         return MonthlyPayments::create([
             'resident_id' => $dto->resident_id,
             'type_payment' => $dto->type_payment,
             'month' => $dto->month,
             'year' => $dto->year,
             'flow_type' => $dto->flow_type,
-            'value' => $value,
+            'value' => (int)$value,
             'description' => $dto->description,
         ]);
     }
