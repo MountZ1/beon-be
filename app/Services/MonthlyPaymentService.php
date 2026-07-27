@@ -74,18 +74,21 @@ class MonthlyPaymentService
 
     public function massCreate(MassMonthlyPaymentDTO $dto): Collection
     {
-        $houseResident = HouseResident::where('resident_id', $dto->resident_id)
+        $activeHouseResident = HouseResident::where('resident_id', $dto->resident_id)
             ->whereNull('end_at')
             ->latest('start_at')
             ->first();
-
-        if (!$houseResident) {
+        if (!$activeHouseResident) {
             throw ValidationException::withMessages([
                 'resident_id' => 'Resident ini tidak memiliki rumah aktif saat ini.',
             ]);
         }
 
-        $startDate = Carbon::parse($houseResident->start_at);
+        $firstHouseResident = HouseResident::where('resident_id', $dto->resident_id)
+            ->oldest('start_at')
+            ->first();
+
+        $startDate = Carbon::parse($firstHouseResident->start_at);
         $residentStartDate = $startDate->day === 1
             ? $startDate->copy()->startOfMonth()
             : $startDate->copy()->addMonthNoOverflow()->startOfMonth();
@@ -109,22 +112,18 @@ class MonthlyPaymentService
 
         return DB::transaction(function () use ($dto, $paymentStartDate, $value) {
             $records = collect();
-
             for ($i = 0; $i < $dto->month_total; $i++) {
                 $period = $paymentStartDate->copy()->addMonths($i);
-
                 $exists = MonthlyPayments::where('resident_id', $dto->resident_id)
                     ->where('type_payment', $dto->type_payment)
                     ->where('year', $period->year)
                     ->where('month', $period->month)
                     ->exists();
-
                 if ($exists) {
                     throw ValidationException::withMessages([
                         'month_total' => "Pembayaran bulan {$period->format('F Y')} sudah tercatat.",
                     ]);
                 }
-
                 $records->push(MonthlyPayments::create([
                     'resident_id' => $dto->resident_id,
                     'type_payment' => $dto->type_payment,
@@ -134,10 +133,10 @@ class MonthlyPaymentService
                     'value' => $value,
                 ]));
             }
-
             return $records;
         });
     }
+
     private function getFixedPaymentValue(string $typePayment): int
     {
         return match ($typePayment) {
@@ -187,30 +186,20 @@ class MonthlyPaymentService
     {
         $year = (int) $request->query('year', now()->year);
         $currentYear = now()->year;
+        $now = Carbon::now()->startOfMonth();
 
-        $houseResident = HouseResident::where('resident_id', $residentId)
-            ->whereNull('end_at')
-            ->latest('start_at')
-            ->first();
+        $houseResidents = HouseResident::where('resident_id', $residentId)
+            ->orderBy('start_at')
+            ->get();
 
-        if (!$houseResident) {
+        if ($houseResidents->isEmpty()) {
             throw ValidationException::withMessages([
-                'resident_id' => 'Resident ini tidak memiliki rumah aktif saat ini.',
+                'resident_id' => 'Resident ini tidak pernah memiliki rumah.',
             ]);
         }
 
-        $startDate = Carbon::parse($houseResident->start_at);
-        $firstPaymentMonth = $startDate->day === 1
-            ? $startDate->copy()->startOfMonth()
-            : $startDate->copy()->addMonthNoOverflow()->startOfMonth();
-
-        $now = Carbon::now()->startOfMonth();
-
         $yearStart = Carbon::create($year, 1, 1)->startOfMonth();
         $yearEnd = Carbon::create($year, 12, 1)->startOfMonth();
-
-        $periodStart = $firstPaymentMonth->gt($yearStart) ? $firstPaymentMonth : $yearStart;
-        $periodEnd = $year < $currentYear ? $yearEnd : ($year > $currentYear ? $yearEnd : $now);
 
         $paidRecords = MonthlyPayments::where('resident_id', $residentId)
             ->where('flow_type', 'in')
@@ -220,27 +209,54 @@ class MonthlyPaymentService
 
         $types = ['satpam', 'kebersihan'];
         $result = collect();
+        $coveredMonths = collect();
 
-        if ($periodStart->gt($periodEnd)) {
-            return $result;
-        }
+        foreach ($houseResidents as $houseResident) {
+            $startDate = Carbon::parse($houseResident->start_at);
+            $firstPaymentMonth = $startDate->day === 1
+                ? $startDate->copy()->startOfMonth()
+                : $startDate->copy()->addMonthNoOverflow()->startOfMonth();
 
-        $period = $periodStart->copy();
-        while ($period->lte($periodEnd)) {
-            foreach ($types as $type) {
-                $key = "{$type}-{$period->year}-{$period->month}";
-                $paid = $paidRecords->get($key);
-                $result->push([
-                    'id' => $paid->id ?? null,
-                    'resident_id' => $residentId,
-                    'type_payment' => $type,
-                    'month' => $period->month,
-                    'year' => $period->year,
-                    'value' => $paid->value ?? $this->getFixedPaymentValue($type),
-                    'is_pay' => (bool) $paid,
-                ]);
+            $houseEnd = $houseResident->end_at
+                ? Carbon::parse($houseResident->end_at)->startOfMonth()
+                : null;
+
+            $periodStart = $firstPaymentMonth->gt($yearStart) ? $firstPaymentMonth : $yearStart;
+            $periodEnd = $houseEnd && $houseEnd->lt($yearEnd) ? $houseEnd : $yearEnd;
+
+            if ($periodStart->gt($periodEnd)) {
+                continue;
             }
-            $period->addMonth();
+
+            $period = $periodStart->copy();
+            while ($period->lte($periodEnd)) {
+                $monthKey = "{$period->year}-{$period->month}";
+                $isFuture = $period->gt($now);
+
+                if (!$coveredMonths->contains($monthKey)) {
+                    foreach ($types as $type) {
+                        $key = "{$type}-{$period->year}-{$period->month}";
+                        $paid = $paidRecords->get($key);
+
+                        if ($isFuture && !$paid) {
+                            continue;
+                        }
+
+                        $result->push([
+                            'id' => $paid->id ?? null,
+                            'resident_id' => $residentId,
+                            'house_id' => $houseResident->house_id,
+                            'type_payment' => $type,
+                            'month' => $period->month,
+                            'year' => $period->year,
+                            'value' => $paid->value ?? $this->getFixedPaymentValue($type),
+                            'is_pay' => (bool) $paid,
+                        ]);
+                    }
+                    $coveredMonths->push($monthKey);
+                }
+                $period->addMonth();
+            }
         }
 
         return $result
